@@ -1,4 +1,4 @@
-# Lead Gen — ICP Qualification & Ranking
+# Lead Gen - ICP Qualification & Ranking
 
 Turn a raw lead CSV into a ranked, evidence-backed list. Every lead's website is
 crawled for real content, judged against a campaign rubric, and the verdict is
