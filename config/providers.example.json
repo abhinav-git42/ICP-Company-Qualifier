@@ -1,0 +1,58 @@
+{
+  "_readme": [
+    "Keys are read from ENVIRONMENT VARIABLES only. This file documents the",
+    "names; it is not loaded by any script and must never hold a real key.",
+    "Tiers with no key set are skipped with a note, not an error."
+  ],
+  "execution": {
+    "free_pool": [
+      "stdlib",
+      "crawl4ai",
+      "scrapling"
+    ],
+    "paid_sequential": [
+      "apify",
+      "firecrawl"
+    ],
+    "notes": "The three free tiers share ONE work queue and run concurrently. A domain that fails one is retried by a free tier that has not tried it. Only when all three fail does it reach a paid tier."
+  },
+  "tiers": {
+    "stdlib": {
+      "cost": "free",
+      "needs": null,
+      "speed": "~1s/domain",
+      "notes": "always available, no install"
+    },
+    "crawl4ai": {
+      "cost": "free",
+      "needs": "pip install crawl4ai && python -m playwright install chromium",
+      "speed": "~40s/domain, 4 workers",
+      "notes": "real browser; richest extractor of the five. Detects captcha walls fast rather than hanging"
+    },
+    "scrapling": {
+      "cost": "free",
+      "needs": "pip install \"scrapling[fetchers]\"",
+      "speed": "~2s/domain, 6 workers",
+      "notes": "TLS fingerprinting via curl_cffi; beats handshake-based blocks that stop stdlib. Browser modes OFF - they fail on Windows and crawl4ai already covers that role"
+    },
+    "apify": {
+      "cost": "$0.023/domain batched, $0.102 unbatched (measured)",
+      "needs": "APIFY_TOKEN",
+      "speed": "~157s per run, up to 20 domains",
+      "actor": "apify/website-content-crawler (aYG0l9s7dbB7j3gbS)",
+      "notes": "ALWAYS batched - every run pays ~60s container startup, so per-domain runs cost 4.4x more"
+    },
+    "firecrawl": {
+      "cost": "per page",
+      "needs": "FIRECRAWL_API_KEY",
+      "speed": "~8s/domain",
+      "api": "https://api.firecrawl.dev/v2/scrape (override with FIRECRAWL_API_URL)",
+      "notes": "strongest anti-bot of the five; the only one that beat DataDome in testing"
+    }
+  },
+  "install_order_trap": "camoufox DOWNGRADES playwright, which silently breaks crawl4ai (it then looks for a different chromium build number). Install camoufox BEFORE crawl4ai, or re-run 'python -m playwright install chromium' afterwards.",
+  "set_them_like_this": {
+    "powershell_permanent": "[Environment]::SetEnvironmentVariable('APIFY_TOKEN','apify_api_...','User')",
+    "git_bash_session": "export APIFY_TOKEN='apify_api_...'"
+  }
+}

@@ -1,0 +1,24 @@
+# ---------------------------------------------------------------------------
+# Campaign data is CLIENT DATA and per-user runtime state. None of it belongs
+# in the repo. The rule is deny-by-default: ignore every campaign, then allow
+# back only the synthetic _test fixture, which contains public domains and no
+# customer information.
+# ---------------------------------------------------------------------------
+campaigns/*
+!campaigns/_test/
+campaigns/_test/cache/
+campaigns/_test/output/
+campaigns/_test/*.jsonl
+campaigns/_test/campaign.json
+
+# Secrets. Keys live in .env (gitignored) or the environment, never in a file
+# that ships.
+.env
+.env.*
+!.env.example
+config/providers.json
+
+__pycache__/
+*.pyc
+.venv/
+venv/

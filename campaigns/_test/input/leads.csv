@@ -1,0 +1,15 @@
+Company,Website,Country,Employees,Contact
+Stripe,stripe.com,United States,5000,a@stripe.com
+Shopify,https://www.shopify.com/,Canada,10000,b@shopify.com
+Codiste,codiste.com,India,60,c@codiste.com
+Notion,www.notion.so,United States,800,d@notion.so
+Figma,https://figma.com,United States,1200,e@figma.com
+Intercom,f@intercom.com,Ireland,900,f@intercom.com
+Deliveroo,deliveroo.co.uk,United Kingdom,3000,g@deliveroo.co.uk
+G2,g2.com,United States,700,h@g2.com
+IANA Example,example.com,United States,1,i@example.com
+Nonexistent Co,thisdomaindoesnotexistxyz123.com,United States,10,j@nope.com
+Codiste Duplicate,codiste.com,India,60,k@codiste.com
+Missing Site,,Germany,50,l@missing.com
+Bad Value,N/A,France,20,m@bad.com
+Vercel,vercel.com,United States,600,n@vercel.com

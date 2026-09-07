@@ -1,0 +1,17 @@
+{
+  "campaign": "_test",
+  "offering_summary": "Test rubric for pipeline validation only.",
+  "disqualifiers": [
+    {"id": "dq_geo", "rule": "Outside target geography (US/Canada only)",
+     "checkable_from": "csv", "column": "Country",
+     "accept_values": ["United States", "Canada"],
+     "comment": "Outside target geography"},
+    {"id": "dq_tiny", "rule": "Under 50 employees", "checkable_from": "csv",
+     "column": "Employees", "max": null, "min": 50,
+     "comment": "Below minimum headcount"}
+  ],
+  "fit_signals": [{"id": "f1", "signal": "Sells software", "weight": "strong"}],
+  "antifit_signals": [],
+  "momentum_signals": [{"id": "m1", "signal": "Hiring engineers", "weight": "strong"}],
+  "tier_definitions": {"Good": "software co", "Avg": "adjacent", "Unfit": "neither"}
+}
