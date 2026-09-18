@@ -1,4 +1,5 @@
-"""Minimal JSON-over-HTTPS client shared by the Apify and Firecrawl tiers.
+"""Minimal JSON-over-HTTPS client shared by the Apify and Firecrawl tiers, and
+by the optional TypeSafe judge.
 
 Both vendors are plain REST, so urllib covers them and neither tier needs a
 pip install -- which is why three of the four tiers are dependency-free.
@@ -11,6 +12,10 @@ import urllib.error
 import urllib.request
 
 from .base import LIMITS, Page, collapse
+
+
+# Rate limits and 5xx are transient. 529 is TypeSafe's "overloaded".
+RETRYABLE_STATUSES = (429, 500, 502, 503, 504, 529)
 
 
 class ApiError(Exception):
@@ -76,7 +81,7 @@ def post_json(url, payload, headers=None, timeout=180):
         # 402 = out of credits, 401 = bad key: both are worth surfacing loudly
         # rather than silently degrading to the next tier.
         raise ApiError("HTTP %d %s" % (exc.code, detail), status=exc.code,
-                       retryable=exc.code in (429, 500, 502, 503, 504),
+                       retryable=exc.code in RETRYABLE_STATUSES,
                        retry_after=_retry_after_of(exc))
     except ApiError:
         raise
@@ -99,7 +104,7 @@ def get_json(url, headers=None, timeout=60):
         except Exception:
             pass
         raise ApiError("HTTP %d %s" % (exc.code, detail), status=exc.code,
-                       retryable=exc.code in (429, 500, 502, 503, 504),
+                       retryable=exc.code in RETRYABLE_STATUSES,
                        retry_after=_retry_after_of(exc))
     except ApiError:
         raise

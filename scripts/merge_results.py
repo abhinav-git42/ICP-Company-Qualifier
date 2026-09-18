@@ -28,6 +28,12 @@ def campaign_dir(slug):
     return os.path.join(ROOT, "campaigns", slug)
 
 
+def judge_of(a):
+    """Who produced a verdict. Lines written before the judge field existed
+    were Claude's, except pre-filter rows."""
+    return a.get("judge") or ("rule" if a.get("source_tier") == "prefilter" else "claude")
+
+
 def unique_header(name, existing):
     """Never silently clobber a column the source file already had."""
     if name not in existing:
@@ -88,7 +94,10 @@ def main():
     stats = Counter()
     rank_stats = Counter()
     tier_stats = Counter()
+    judge_stats = Counter()
     dq_reasons = Counter()
+    flagged = 0
+    disagreed = 0
     divergent = 0
     unassessed = 0
     bad_values = []
@@ -106,7 +115,7 @@ def main():
                 # mode that matters, so unassessed rows are explicit.
                 a = {"fitment": "Unfit", "ranking": 3, "comments": "Not assessed",
                      "crawl_status": (crawl.get(domain) or {}).get("status") or "not_crawled",
-                     "source_tier": "none"}
+                     "source_tier": "none", "judge": "none"}
                 unassessed += 1
 
             fitment = str(a.get("fitment") or "Unfit").strip().title()
@@ -135,6 +144,9 @@ def main():
             stats[fitment] += 1
             rank_stats[ranking] += 1
             tier_stats[a.get("source_tier") or "none"] += 1
+            judge_stats[judge_of(a)] += 1
+            flagged += 1 if a.get("needs_review") else 0
+            disagreed += 1 if a.get("disagree") else 0
             if (fitment == "Good" and ranking != 1) or (fitment == "Unfit" and ranking != 3):
                 divergent += 1
             if a.get("source_tier") == "prefilter":
@@ -157,6 +169,12 @@ def main():
     print("\n  EVIDENCE SOURCE")
     for tier, n in tier_stats.most_common():
         print("    %-12s %5d" % (tier, n))
+    print("\n  VERDICT FROM")
+    for judge, n in judge_stats.most_common():
+        print("    %-12s %5d" % (judge, n))
+    if judge_stats.get("typesafe"):
+        print("    TypeSafe verdicts flagged for review : %d" % flagged)
+        print("    comments disagreeing with TypeSafe   : %d" % disagreed)
     if dq_reasons:
         print("\n  PRE-FILTER DISQUALIFICATIONS")
         for reason, n in dq_reasons.most_common(8):

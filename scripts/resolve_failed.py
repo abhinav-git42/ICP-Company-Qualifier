@@ -84,6 +84,7 @@ def main():
             "evidence": "gate=%s tier=%s" % (r.get("gate_reason"), r.get("source_tier")),
             "crawl_status": r.get("status"),
             "source_tier": r.get("source_tier") or "none",
+            "judge": "rule",
         })
     print("\nwrote %d verdicts to %s" % (len(failed), out))
 

@@ -24,14 +24,16 @@ engineers. Fit answers *are they right*; ranking answers *is now the time*.
 ## Getting started (new machine)
 
 ```bash
-git clone <your-repo-url>
-cd "Lead Gen"
+git clone https://github.com/abhinav-git42/ICP-Company-Qualifier.git
+cd ICP-Company-Qualifier
 python setup.py
 ```
 
 `setup.py` installs the three free crawlers automatically — no account, no card
-— then offers to record the two optional paid keys. Press ENTER to skip either;
-they can be added later by re-running it. Re-running is always safe.
+— then offers to record the optional keys (two paid crawlers, and TypeSafe as an
+alternative judge). Press ENTER to skip any of them; they can be added later by
+re-running it. Re-running is always safe. Setup never picks the judge — each
+campaign does, at `/new`.
 
 ```bash
 python setup.py --check      # verify an install, change nothing
@@ -44,18 +46,23 @@ Verify, then run:
 python scripts/test_gate.py && python scripts/test_tiers.py
 ```
 
-Open the folder in Claude Code and type `/new`.
+Open the folder in Claude Code and type `/new`. When Claude Code asks whether to
+trust the folder, say yes — that also installs the TypeSafe skill this repo
+declares in `.claude/settings.json`.
 
 ### What you need
 
 | | Required? | Notes |
 |---|---|---|
 | Python 3.9+ | **yes** | 3.12 recommended |
+| Claude Code | **yes** | runs `/new`; judges leads by default, on your own plan |
 | Apify token | no | cheap bulk crawling; skip and the tier stays off |
 | Firecrawl key | no | rescues the hard tail; skip and the tier stays off |
+| TypeSafe key | no | lets TypeSafe decide Fitment and Ranking; skip and Claude judges |
 
 **Without any keys the pipeline still works** — the three free crawlers clear
-most of a typical list. Missing keys disable a tier with a note, never an error.
+most of a typical list, and Claude judges every lead. Missing keys disable a
+tier or the TypeSafe judge with a note, never an error.
 
 ### Keys
 
@@ -79,8 +86,56 @@ run your own campaigns, and nothing you crawl or score is ever committed.
 /new
 ```
 
-That starts the `icp-qualify` skill, which walks the whole thing: five plain-English
+That starts the `icp-qualify` skill, which walks the whole thing: a few plain-English
 questions, a rubric you confirm, your CSV, the crawl, the evaluation, the output.
+
+---
+
+## Who judges: Claude or TypeSafe
+
+Everything except the evaluation step is the same either way.
+
+| | **Claude** (default) | **TypeSafe** (optional) |
+|---|---|---|
+| Decides Fitment and Ranking | Claude, reading each digest | TypeSafe, one API call per lead |
+| Writes the Comments | Claude | Claude |
+| Needs | nothing beyond Claude Code | `TYPESAFE_API_KEY` |
+| Costs | your Claude plan usage | estimated $0.05–0.25 per 1,000 leads at list price, growing with rubric size (`--dry-run` prints the exact estimate) |
+
+**Choosing — per campaign.** Every `/new` asks who should judge that campaign,
+with Claude as the default, and saves the answer to that campaign's
+`campaign.json`. Nothing machine-wide decides it, so two campaigns on the same
+machine can use different judges. Picking TypeSafe without a key (or with a
+rejected one) falls back to Claude with a one-line warning; add the key with
+`python setup.py` and the campaign can switch before its evaluation step.
+
+**How TypeSafe decides.** `scripts/typesafe_judge.py` turns the confirmed rubric
+into questions: every disqualifier, fit, anti-fit and momentum signal becomes a
+yes/no question, and the grade a Good/Avg/Unfit choice using your tier
+definitions. All of them go in one request per lead. The answers come back as
+probabilities, and **code** — not a prompt — applies the scoring guide:
+disqualifiers first, a tie between two grades takes the lower one, a strong
+anti-fit forces `Unfit`, and the Ranking table uses the momentum signals.
+The thresholds sit in one place, `TYPESAFE` at the top of the script, and are
+starting points to tune on your own leads.
+
+**How Claude comments.** `next_batch.py --comments` shows Claude each verdict
+with the signals TypeSafe found and the digest. Claude writes only the comment,
+to a separate file, so it cannot move a grade. `--finalize` then joins the two
+into `assessments.jsonl`, and the merge works as before. If a site plainly
+contradicts a verdict, Claude marks the comment `disagree` instead of arguing
+with it, and QA re-reads those along with any verdict TypeSafe was unsure of.
+
+**Comparing before you switch.** On a campaign Claude already judged:
+
+```bash
+python scripts/typesafe_judge.py --campaign <slug> --all
+python scripts/compare_judges.py --campaign <slug>
+```
+
+The first decides every lead alongside Claude's verdicts without touching them.
+The second prints agreement for Fitment and Ranking, how TypeSafe's probability
+of `Good` lines up with Claude's grades, and the leads where they differ.
 
 ---
 
@@ -88,12 +143,13 @@ questions, a rubric you confirm, your CSV, the crawl, the evaluation, the output
 
 ```
 /new
-  1. INTAKE      five plain-English questions      → brief.md
+  1. INTAKE      plain-English questions + judge   → brief.md
   2. RUBRIC      interpreted, then you confirm     → rubric.json
   3. CSV         column detection + data health    → inspect_csv.py
   4. PRE-FILTER  column-only rules, before any fetch
   5. CRAWL       4-tier cascade, cached, resumable
-  6. EVALUATE    25 digests at a time, checkpointed
+  6. EVALUATE    Claude: 25 digests at a time, checkpointed
+                 TypeSafe: decide all, then Claude comments 25 at a time
   7. MERGE       original CSV + 4 new columns
   8. QA          distribution, edge cases, per-tier audit
 ```
@@ -289,10 +345,13 @@ Every script takes `--campaign <slug>` and is safe to re-run.
 | `prefilter.py` | Applies CSV-column disqualifiers before any fetch. `--apply` to write. |
 | `crawl_sites.py` | The cascade. `--escalate --confirm-spend` for paid tiers. |
 | `resolve_failed.py` | Writes `Unfit`/`3` for unverifiable domains. `--apply` to write. |
-| `next_batch.py` | Prints the next 25 unassessed digests. `--status` for counts. |
+| `next_batch.py` | Prints the next 25 unassessed digests. `--status` for counts. `--comments` for TypeSafe runs. |
+| `typesafe_judge.py` | TypeSafe decisions. `--status`, `--set-judge`, `--dry-run`, `--finalize`, `--all`. |
+| `compare_judges.py` | Claude vs TypeSafe agreement on one campaign. Read-only. |
 | `merge_results.py` | Appends the columns to the original CSV. `--no-status` to drop it. |
 | `test_gate.py` | Quality-gate judgment tests (12). Run after touching `GATE`. |
 | `test_tiers.py` | Tier + pool tests (42). Run after touching any fetcher. |
+| `test_typesafe.py` | TypeSafe judge tests, offline. Run after touching `typesafe_judge.py`. |
 | `freepool.py` | Shared work queue for the free tiers (not a CLI). |
 
 `prefilter.py` and `resolve_failed.py` are dry-run by default.
@@ -320,6 +379,7 @@ The crawl cache is per-domain and persists. So:
 
 - **Re-run the crawl** — near-instant, fetches nothing, costs nothing.
 - **Fix the rubric and re-judge** — delete `campaigns/<slug>/assessments.jsonl`
+  (and, for a TypeSafe campaign, `typesafe_decisions.jsonl` and `comments.jsonl`)
   and re-run from step 8. The crawl is untouched, so this is free.
 - **Interrupt anything** — nothing is lost. Progress lives in files, not memory,
   which is why a 1000-lead run can span two sessions.
@@ -337,6 +397,8 @@ campaigns/<slug>/
   cache/<domain>.json   per-domain crawl cache, records the winning tier
   crawl_results.jsonl   digests + gate outcome, rebuilt each run
   crawl_log.jsonl       every tier attempt, appended forever
+  typesafe_decisions.jsonl  TypeSafe runs: grades + every probability
+  comments.jsonl        TypeSafe runs: Claude's comment per lead
   assessments.jsonl     one verdict per lead
   output/leads_qualified.csv
 ```
@@ -354,4 +416,13 @@ campaigns/<slug>/
 - **Some sites defeat everything but Firecrawl** (DataDome, hard Cloudflare).
   Budget for tier 3 actually being reached on a small tail.
 - **The rubric is the whole ballgame.** Output quality tracks rubric specificity
-  almost exactly, which is why step 2 has a confirmation gate.
+  almost exactly, which is why step 2 has a confirmation gate. With TypeSafe it
+  matters even more: each signal is asked literally, so vague signals give
+  vague probabilities.
+- **TypeSafe does not shorten the session much.** Claude still reads every
+  digest to write its comment. What changes is who decides the grades:
+  consistent, probability-backed decisions instead of batch-by-batch judgment.
+- **TypeSafe reads English best.** Other languages work at lower accuracy;
+  watch the review flags on non-English lists.
+- **TypeSafe thresholds are starting points.** Tune `TYPESAFE` in
+  `scripts/typesafe_judge.py` with `compare_judges.py` before relying on them.

@@ -3,8 +3,10 @@
     python setup.py
 
 Installs the three FREE crawlers automatically (no account, no card), then
-offers to record the two OPTIONAL paid API keys. Everything it does is
-idempotent -- re-run it any time to repair an install or add a key later.
+offers to record the OPTIONAL API keys -- two paid crawlers, and TypeSafe as an
+alternative judge. Whether Claude or TypeSafe judges is chosen per campaign at
+/new, never here. Everything it does is idempotent -- re-run it any time to
+repair an install or add a key later.
 
     python setup.py --check       verify an existing install, change nothing
     python setup.py --no-keys     install only, never prompt for keys
@@ -36,6 +38,8 @@ KEYS = [
      "cheap bulk crawling, ~$0.023/domain"),
     ("FIRECRAWL_API_KEY", "Firecrawl", "https://www.firecrawl.dev/app/api-keys",
      "strongest anti-bot; rescues the hard tail"),
+    ("TYPESAFE_API_KEY", "TypeSafe", "https://console.typesafe.ai/settings/keys",
+     "optional judge: decides Fitment and Ranking, Claude still writes comments"),
 ]
 
 BAR = "=" * 68
@@ -95,6 +99,15 @@ def probe():
                 % (name, kind, f.unavailable_reason()))
             if not f.costs_money:
                 all_free_ok = False
+
+    from typesafe_judge import api_key
+    say()
+    say("  JUDGE (chosen per campaign at /new)")
+    say("    claude     ready  -- runs on your Claude Code plan, no key")
+    if api_key():
+        say("    typesafe   ready")
+    else:
+        say("    typesafe   not configured -- no TYPESAFE_API_KEY")
     return all_free_ok
 
 
@@ -134,7 +147,7 @@ def read_env():
 def write_env(values):
     lines = [
         "# Written by setup.py. This file is gitignored -- never commit it.",
-        "# Both keys are OPTIONAL; the three free crawlers work without them.",
+        "# Every key is OPTIONAL; the free crawlers and Claude work without them.",
         "",
     ]
     for key, label, url, _ in KEYS:
@@ -153,11 +166,13 @@ def write_env(values):
 def prompt_keys():
     say()
     say(BAR)
-    say("OPTIONAL PAID CRAWLERS")
+    say("OPTIONAL API KEYS")
     say(BAR)
-    say("  The free crawlers handle most sites. These two only get used for")
-    say("  what the free ones cannot fetch, and never without confirmation.")
-    say("  Press ENTER to skip either one -- you can re-run setup.py later.")
+    say("  The free crawlers handle most sites. Apify and Firecrawl only get")
+    say("  used for what the free ones cannot fetch, and never without")
+    say("  confirmation. TypeSafe is an alternative judge you can pick per")
+    say("  campaign at /new; without the key, Claude judges.")
+    say("  Press ENTER to skip any of them -- you can re-run setup.py later.")
     say()
 
     values = read_env()

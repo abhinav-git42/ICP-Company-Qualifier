@@ -1,13 +1,17 @@
 # Scoring guide — Fitment, Ranking, Comments
 
-One JSON line per domain, appended to `campaigns/<slug>/assessments.jsonl`:
+When Claude is the judge, one JSON line per domain, appended to
+`campaigns/<slug>/assessments.jsonl`:
 
 ```json
-{"domain":"acme.com","fitment":"Good","ranking":1,"comments":"Builds LLM apps for insurers - direct match","evidence":"/services: 'AI implementation for insurance carriers'","crawl_status":"ok","source_tier":"stdlib"}
+{"domain":"acme.com","fitment":"Good","ranking":1,"comments":"Builds LLM apps for insurers - direct match","evidence":"/services: 'AI implementation for insurance carriers'","crawl_status":"ok","source_tier":"stdlib","judge":"claude"}
 ```
 
-`evidence` and `source_tier` stay internal — they exist for the QA pass and are
-not written to the output CSV.
+`evidence`, `source_tier` and `judge` stay internal — they exist for the QA pass
+and are not written to the output CSV.
+
+When TypeSafe is the judge, `scripts/typesafe_judge.py` applies the rules below
+in code and you write only the comment — see *Comments on TypeSafe verdicts*.
 
 ---
 
@@ -96,6 +100,42 @@ make the divergence obvious — say what fit, and what was missing or made up fo
 
 Use plain ASCII hyphens, not em-dashes: these land in a CSV that gets opened in
 Excel and imported into sending tools.
+
+---
+
+## Comments on TypeSafe verdicts
+
+When the campaign's judge is TypeSafe, the grades are already decided and each
+batch shows them (`VERDICT: Good / 2`) with the signals TypeSafe found. You
+write only the comment, one line per domain in `comments.jsonl`:
+
+```json
+{"domain":"acme.com","comments":"Regulated-vertical SaaS, but no hiring or launch signal","evidence":"/product: 'claims platform for regional insurers'"}
+```
+
+Every rule above still applies: 12 words or fewer, grounded in the site, never
+copy-pasteable. The difference is that the comment **explains a verdict you did
+not choose**:
+
+- Name the thing on the site that supports the grade. Use the listed signals as
+  pointers, but quote what the site actually says, not the rubric wording.
+- On a divergent row (`Good`/`2`, `Avg`/`2`), say what fit and what was missing
+  or made up for it, exactly as for a Claude verdict.
+- On a disqualified row, name the rule, as in step 1 of the order of operations.
+- If the row is flagged for review, still write the most accurate comment you
+  can. Don't mention the flag; it lives in the decision file.
+
+**If the site plainly contradicts the verdict**, do not bend the comment to fit
+it and do not change the grade. Write what the site actually shows and add
+`"disagree": true`:
+
+```json
+{"domain":"acme.com","comments":"Design agency - no engineering function visible","evidence":"/about: 'award-winning brand studio'","disagree":true}
+```
+
+Use it for a clear contradiction, not a close call. The merge summary counts
+these and QA re-reads every one, which is how a bad threshold or a vague
+rubric gets caught.
 
 ---
 

@@ -137,6 +137,7 @@ def main():
             "evidence": "pre-filter rule %s: %s" % (rule.get("id"), why),
             "crawl_status": "not_crawled",
             "source_tier": "prefilter",
+            "judge": "rule",
         })
     print("\nwrote %d verdicts to %s" % (len(hits), out))
     print("These rows are excluded from the crawl -- run crawl_sites.py next.")

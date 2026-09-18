@@ -6,6 +6,8 @@ long run resumes cleanly across sessions -- which matters at ~40 batches for a
 
   python scripts/next_batch.py --campaign acme --size 25
   python scripts/next_batch.py --campaign acme --status      # just the counts
+  python scripts/next_batch.py --campaign acme --comments    # TypeSafe runs: verdict
+                                                             # is fixed, write the comment
 """
 
 import argparse
@@ -62,6 +64,54 @@ def load_context(slug):
     return ctx, idx
 
 
+def comment_batch(args, cdir, results, done):
+    """TypeSafe runs: the verdict is already decided. Show it beside the digest
+    so the comment explains it, and never ask for a verdict."""
+    from typesafe_judge import COMMENTS, DECISIONS, latest_by_domain
+
+    decisions = latest_by_domain(jsonl_read(os.path.join(cdir, DECISIONS)))
+    commented = latest_by_domain(jsonl_read(os.path.join(cdir, COMMENTS)))
+    digests = {r.get("domain"): r for r in results}
+    pending = [d for d in decisions if d not in commented and d not in done]
+
+    print("campaign %s  --  %d decided by TypeSafe | %d commented | %d pending comment"
+          % (args.campaign, len(decisions), len(set(decisions) & set(commented)),
+             len(pending)))
+    if args.status:
+        return
+    batch = pending[:args.size]
+    if not batch:
+        print("\nNothing pending. Next: python scripts/typesafe_judge.py --campaign %s "
+              "--finalize" % args.campaign)
+        return
+
+    ctx, _ = load_context(args.campaign)
+    print("\n" + "#" * 70)
+    print("# COMMENT BATCH OF %d  --  one JSON line each to comments.jsonl" % len(batch))
+    print("# The verdict is TypeSafe's. Explain it; do not change it.")
+    print("#" * 70)
+    for i, d in enumerate(batch, 1):
+        dec, r = decisions[d], digests.get(d) or {}
+        print("\n----- [%d/%d] %s  (tier=%s, %d chars) -----"
+              % (i, len(batch), d, r.get("source_tier"), r.get("chars", 0)))
+        print("VERDICT: %s / %s   (%s)" % (dec.get("fitment"), dec.get("ranking"),
+                                          dec.get("why", "")))
+        by_kind = {}
+        for s in dec.get("signals_present") or []:
+            by_kind.setdefault(s.get("kind"), []).append(s.get("text", ""))
+        for kind in ("disqualifier", "fit", "anti-fit", "momentum"):
+            if by_kind.get(kind):
+                print("  %-12s %s" % (kind + ":", " | ".join(by_kind[kind])))
+        if dec.get("needs_review"):
+            print("  review:      " + "; ".join(dec["needs_review"]))
+        if ctx.get(d):
+            print("CSV: " + ctx[d])
+        print(r.get("digest") or "(no content)")
+    print("\n" + "#" * 70)
+    print("# END BATCH -- %d remaining after this one" % max(0, len(pending) - len(batch)))
+    print("#" * 70)
+
+
 def main():
     enable_utf8_stdout()
     ap = argparse.ArgumentParser()
@@ -70,12 +120,27 @@ def main():
     ap.add_argument("--status", action="store_true", help="counts only")
     ap.add_argument("--include-failed", action="store_true",
                     help="also emit gate-failed domains (normally auto-resolved)")
+    ap.add_argument("--comments", action="store_true",
+                    help="TypeSafe runs: decided domains that still need a comment")
     args = ap.parse_args()
 
     cdir = campaign_dir(args.campaign)
     results = jsonl_read(os.path.join(cdir, "crawl_results.jsonl"))
     assessed = jsonl_read(os.path.join(cdir, "assessments.jsonl"))
     done = {a.get("domain") for a in assessed if a.get("domain")}
+
+    if args.comments:
+        comment_batch(args, cdir, results, done)
+        return
+
+    cfg_path = os.path.join(cdir, "campaign.json")
+    if os.path.exists(cfg_path) and not args.include_failed:
+        with open(cfg_path, "r", encoding="utf-8") as fh:
+            if json.load(fh).get("judge") == "typesafe":
+                print("This campaign's judge is TypeSafe, so Claude does not grade it.\n"
+                      "Use: python scripts/next_batch.py --campaign %s --comments"
+                      % args.campaign)
+                return
 
     passed = [r for r in results if r.get("gate_ok")]
     failed = [r for r in results if not r.get("gate_ok")]
